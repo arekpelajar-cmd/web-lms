@@ -6,6 +6,7 @@ import { useChat } from "@ai-sdk/react";
 import { Bot, LoaderCircle, MessageCircle, Send, Square, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { CHAT_SERVICE_ERROR, validateChatResponse } from "@/lib/chat-fetch";
 
 function messageText(message: UIMessage) {
   return message.parts
@@ -18,7 +19,11 @@ export function ChatbotWidget() {
   const [isOpen, setIsOpen] = useState(false);
   const [input, setInput] = useState("");
   const { messages, sendMessage, status, error, stop } = useChat({
-    transport: new DefaultChatTransport({ api: "/api/chat" }),
+    transport: new DefaultChatTransport({
+      api: "/api/chat",
+      fetch: async (input, init) =>
+        validateChatResponse(await fetch(input, init)),
+    }),
   });
 
   const isBusy = status === "submitted" || status === "streaming";
@@ -78,7 +83,7 @@ export function ChatbotWidget() {
             ))}
             {error && (
               <p role="alert" className="text-sm text-destructive">
-                {error.message || "Pesan gagal dikirim. Silakan coba lagi."}
+                {CHAT_SERVICE_ERROR}
               </p>
             )}
           </div>

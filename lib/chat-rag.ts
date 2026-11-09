@@ -1,5 +1,4 @@
 import { GoogleGenAI } from "@google/genai";
-import { sanitizeHtml } from "@/lib/sanitize";
 
 export const EMBEDDING_DIMENSIONS = 768;
 
@@ -19,8 +18,13 @@ function getGenAI() {
 }
 
 export function htmlToPlainText(html: string) {
-  const safeHtml = sanitizeHtml(html);
-  return safeHtml
+  return html
+    .replace(/<!--[\s\S]*?-->/g, " ")
+    .replace(
+      /<(script|style|iframe|object|svg|math|noscript)\b[^>]*>[\s\S]*?<\/\1\s*>/gi,
+      " ",
+    )
+    .replace(/<img\b[^>]*\balt=(["'])(.*?)\1[^>]*>/gi, " $2 ")
     .replace(/<\/(p|h[1-6]|li|br|div|tr|blockquote|pre)>/gi, "\n")
     .replace(/<[^>]*>/g, " ")
     .replace(/&nbsp;/gi, " ")
