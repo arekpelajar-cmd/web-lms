@@ -144,6 +144,16 @@ export async function POST(request: Request) {
     console.info("Chatbot phase started:", phase);
     const result = streamText({
       model: google(process.env.GOOGLE_CHAT_MODEL || "gemini-3.8-flash"),
+      maxRetries: 0,
+      abortSignal: AbortSignal.any([
+        request.signal,
+        AbortSignal.timeout(30_000),
+      ]),
+      providerOptions: {
+        google: {
+          thinkingConfig: { thinkingLevel: "low" },
+        },
+      },
       system: [
         "Anda adalah asisten belajar EduSpace untuk mata kuliah Rangkaian Listrik.",
         "Jawab hanya menggunakan fakta yang tercantum dalam KONTEN MATERI di bawah.",
@@ -164,8 +174,8 @@ export async function POST(request: Request) {
         question,
       ].join("\n"),
       timeout: {
-        totalMs: 45_000,
-        firstChunkMs: 20_000,
+        totalMs: 30_000,
+        firstChunkMs: 25_000,
         chunkMs: 15_000,
       },
       onError: ({ error }) => {
