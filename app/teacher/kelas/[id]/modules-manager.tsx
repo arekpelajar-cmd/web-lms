@@ -92,6 +92,7 @@ type QuizData = {
   class_id?: string | null;
   subject_id?: string | null;
   type?: "chapter" | "assessment";
+  purpose?: "practice" | "pre_test";
   title: string;
   description?: string | null;
   passing_score: number;
@@ -116,6 +117,8 @@ type MaterialData = {
   title: string;
   content?: string | null;
   video_url?: string | null;
+  is_pre_class?: boolean;
+  pre_class_due_at?: string | null;
   order_index: number;
   created_at?: string;
   simulations?: SimulationItem[];
@@ -195,6 +198,8 @@ export function ModulesManager({
   const [matTitle, setMatTitle] = useState("");
   const [matVideoUrl, setMatVideoUrl] = useState("");
   const [matContent, setMatContent] = useState("");
+  const [matIsPreClass, setMatIsPreClass] = useState(false);
+  const [matPreClassDueAt, setMatPreClassDueAt] = useState("");
   const [materialAudios, setMaterialAudios] = useState<MaterialAudioData[]>([]);
   const [audioTitle, setAudioTitle] = useState("");
   const [audioTranscript, setAudioTranscript] = useState("");
@@ -216,6 +221,9 @@ export function ModulesManager({
     null,
   );
   const [quizType, setQuizType] = useState<"chapter" | "assessment">("chapter");
+  const [quizPurpose, setQuizPurpose] = useState<"practice" | "pre_test">(
+    "practice",
+  );
   const [quizTitle, setQuizTitle] = useState("");
   const [quizDesc, setQuizDesc] = useState("");
   const [passingScore, setPassingScore] = useState("70");
@@ -336,6 +344,8 @@ export function ModulesManager({
     setMatTitle("");
     setMatVideoUrl("");
     setMatContent("");
+    setMatIsPreClass(false);
+    setMatPreClassDueAt("");
     setMaterialAudios([]);
     setAudioTitle("");
     setAudioTranscript("");
@@ -352,6 +362,8 @@ export function ModulesManager({
     setMatTitle(mat.title);
     setMatVideoUrl(mat.video_url || "");
     setMatContent(mat.content || "");
+    setMatIsPreClass(Boolean(mat.is_pre_class));
+    setMatPreClassDueAt(formatDateTimeForInput(mat.pre_class_due_at));
     setMaterialAudios(
       [...(mat.material_audios ?? [])].sort(
         (a, b) => a.order_index - b.order_index,
@@ -379,6 +391,8 @@ export function ModulesManager({
     formData.append("title", matTitle);
     formData.append("video_url", matVideoUrl);
     formData.append("content", matContent);
+    formData.append("is_pre_class", String(matIsPreClass));
+    formData.append("pre_class_due_at", matPreClassDueAt);
 
     const isNewMaterial = !editMaterialTarget;
     const res = editMaterialTarget
@@ -398,6 +412,8 @@ export function ModulesManager({
         title: matTitle,
         content: matContent,
         video_url: matVideoUrl,
+        is_pre_class: matIsPreClass,
+        pre_class_due_at: matPreClassDueAt || null,
         order_index: 0,
         material_audios: [],
       });
@@ -616,6 +632,7 @@ export function ModulesManager({
     setQuizModuleTarget(m);
     setEditQuizTarget(null);
     setQuizType("chapter");
+    setQuizPurpose("practice");
     setQuizTitle("");
     setQuizDesc("");
     setPassingScore("70");
@@ -637,6 +654,7 @@ export function ModulesManager({
     setQuizModuleTarget(m);
     setEditQuizTarget(qz);
     setQuizType(qz.type ?? "chapter");
+    setQuizPurpose(qz.purpose ?? "practice");
     setQuizTitle(qz.title);
     setQuizDesc(qz.description || "");
     setPassingScore(String(qz.passing_score));
@@ -706,6 +724,7 @@ export function ModulesManager({
 
     const formData = new FormData();
     formData.append("type", quizType);
+    formData.append("purpose", quizPurpose);
     formData.append("class_id", classId);
     formData.append("subject_id", quizModuleTarget.subject_id);
     formData.append("module_id", quizModuleTarget.id);
@@ -1038,6 +1057,14 @@ export function ModulesManager({
                                 {mat.title}
                               </p>
                               <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground mt-0.5">
+                                {mat.is_pre_class && (
+                                  <Badge
+                                    variant="outline"
+                                    className="text-[10px] border-amber-500/30 text-amber-700 dark:text-amber-300"
+                                  >
+                                    Pra-kelas
+                                  </Badge>
+                                )}
                                 {mat.simulations &&
                                   mat.simulations.length > 0 && (
                                     <span className="flex items-center gap-1 text-primary font-medium">
@@ -1157,6 +1184,11 @@ export function ModulesManager({
                                 <Badge variant="outline" className="text-xs">
                                   {qz.questions?.length || 0} Soal
                                 </Badge>
+                                {qz.purpose === "pre_test" && (
+                                  <Badge className="bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30">
+                                    Pre-test pra-kelas
+                                  </Badge>
+                                )}
                                 {qz.due_at && (
                                   <Badge
                                     variant="outline"
@@ -1415,6 +1447,42 @@ export function ModulesManager({
                   Pratinjau Video:
                 </p>
                 <VideoEmbed url={matVideoUrl} title="Pratinjau Video" />
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-3 rounded-lg border p-3">
+            <label className="flex items-start gap-2.5 text-sm">
+              <input
+                type="checkbox"
+                checked={matIsPreClass}
+                onChange={(event) => {
+                  setMatIsPreClass(event.target.checked);
+                  if (!event.target.checked) setMatPreClassDueAt("");
+                }}
+                className="mt-0.5 h-4 w-4 accent-primary"
+              />
+              <span>
+                <span className="block font-medium">Materi pra-kelas</span>
+                <span className="block text-xs text-muted-foreground">
+                  Materi ini muncul di daftar persiapan siswa sebelum pertemuan.
+                </span>
+              </span>
+            </label>
+            {matIsPreClass && (
+              <div className="space-y-1.5">
+                <Label htmlFor="mat-preclass-due" className="text-xs">
+                  Target selesai (opsional, WIB)
+                </Label>
+                <Input
+                  id="mat-preclass-due"
+                  type="datetime-local"
+                  value={matPreClassDueAt}
+                  onChange={(event) => setMatPreClassDueAt(event.target.value)}
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  Atur sekitar dua hari sebelum kelas dimulai (H-2).
+                </p>
               </div>
             )}
           </div>
@@ -1717,6 +1785,39 @@ export function ModulesManager({
               </button>
             </div>
           </div>
+
+          <fieldset className="space-y-2 rounded-lg border p-3">
+            <legend className="px-1 text-sm font-semibold">Tujuan kuis</legend>
+            {(
+              [
+                ["practice", "Latihan / kuis biasa"],
+                ["pre_test", "Pre-test pra-kelas"],
+              ] as const
+            ).map(([value, label]) => (
+              <label
+                key={value}
+                className="flex items-center gap-2 rounded-md p-2 text-xs hover:bg-muted/40"
+              >
+                <input
+                  type="radio"
+                  name="quiz_purpose"
+                  value={value}
+                  checked={quizPurpose === value}
+                  onChange={() => setQuizPurpose(value)}
+                  className="h-4 w-4 accent-primary"
+                />
+                <span>{label}</span>
+              </label>
+            ))}
+            {quizPurpose === "pre_test" && (
+              <p className="px-2 text-[11px] text-muted-foreground">
+                Atur target pengumpulan sekitar H-2 sebelum pertemuan. Pre-test
+                selesai dihitung satu kali untuk poin. Untuk menegakkan batas
+                waktu, gunakan jenis Kuis Penilaian; target Kuis Bab hanya
+                rekomendasi.
+              </p>
+            )}
+          </fieldset>
 
           <div className="space-y-2">
             <Label htmlFor="quiz-title">Judul Kuis</Label>

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireRole } from "@/lib/auth";
+import { parseDateTimeLocalWib } from "@/lib/assignment-utils";
 
 export type ActionState = {
   success?: boolean;
@@ -177,9 +178,18 @@ export async function createMaterialAction(
     const title = (formData.get("title") as string)?.trim();
     const content = (formData.get("content") as string)?.trim() || "";
     const videoUrl = (formData.get("video_url") as string)?.trim() || null;
+    const isPreClass = formData.get("is_pre_class") === "true";
+    const preClassDueAtRaw = (formData.get("pre_class_due_at") as string)?.trim();
+    const preClassDueAt =
+      isPreClass && preClassDueAtRaw
+        ? parseDateTimeLocalWib(preClassDueAtRaw)
+        : null;
 
     if (!moduleId) return { error: "Modul wajib ditentukan." };
     if (!title) return { error: "Judul materi wajib diisi." };
+    if (isPreClass && preClassDueAtRaw && !preClassDueAt) {
+      return { error: "Batas waktu pra-kelas tidak valid." };
+    }
 
     // Ambil order_index terakhir di modul ini
     const { data: lastMaterial } = await supabase
@@ -199,6 +209,8 @@ export async function createMaterialAction(
         title,
         content,
         video_url: videoUrl,
+        is_pre_class: isPreClass,
+        pre_class_due_at: preClassDueAt?.toISOString() ?? null,
         order_index: nextOrder,
       })
       .select("id")
@@ -207,6 +219,7 @@ export async function createMaterialAction(
     if (error) return { error: error.message };
 
     if (classId) revalidatePath(`/teacher/kelas/${classId}`);
+    revalidatePath("/student/pra-kelas");
     return { success: true, materialId: data.id };
   } catch (err) {
     return {
@@ -227,8 +240,17 @@ export async function updateMaterialAction(
     const title = (formData.get("title") as string)?.trim();
     const content = (formData.get("content") as string)?.trim() || "";
     const videoUrl = (formData.get("video_url") as string)?.trim() || null;
+    const isPreClass = formData.get("is_pre_class") === "true";
+    const preClassDueAtRaw = (formData.get("pre_class_due_at") as string)?.trim();
+    const preClassDueAt =
+      isPreClass && preClassDueAtRaw
+        ? parseDateTimeLocalWib(preClassDueAtRaw)
+        : null;
 
     if (!title) return { error: "Judul materi wajib diisi." };
+    if (isPreClass && preClassDueAtRaw && !preClassDueAt) {
+      return { error: "Batas waktu pra-kelas tidak valid." };
+    }
 
     const { error } = await supabase
       .from("materials")
@@ -236,12 +258,15 @@ export async function updateMaterialAction(
         title,
         content,
         video_url: videoUrl,
+        is_pre_class: isPreClass,
+        pre_class_due_at: preClassDueAt?.toISOString() ?? null,
       })
       .eq("id", materialId);
 
     if (error) return { error: error.message };
 
     if (classId) revalidatePath(`/teacher/kelas/${classId}`);
+    revalidatePath("/student/pra-kelas");
     return { success: true };
   } catch (err) {
     return {

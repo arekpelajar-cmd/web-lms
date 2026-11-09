@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireRole } from "@/lib/auth";
 import type { QuizSubmissionResult } from "@/lib/types";
 import { questionExplanationSchema, quizSchema } from "@/lib/quiz-validator";
+import { parseDateTimeLocalWib } from "@/lib/assignment-utils";
 
 export type ActionState = {
   success?: boolean;
@@ -26,6 +27,10 @@ export async function createQuizAction(
     const type = ((formData.get("type") as string)?.trim() || "chapter") as
       | "chapter"
       | "assessment";
+    const purpose = (formData.get("purpose") as string)?.trim() || "practice";
+    if (purpose !== "practice" && purpose !== "pre_test") {
+      return { error: "Tujuan kuis tidak valid." };
+    }
     const classId = (formData.get("class_id") as string)?.trim() || null;
     const subjectId = (formData.get("subject_id") as string)?.trim() || null;
     const moduleId = (formData.get("module_id") as string)?.trim() || null;
@@ -53,10 +58,23 @@ export async function createQuizAction(
     const maxAttemptsRaw = (formData.get("max_attempts") as string)?.trim();
     const maxAttempts = maxAttemptsRaw ? parseInt(maxAttemptsRaw, 10) : null;
 
-    const openAt = openAtRaw ? new Date(openAtRaw).toISOString() : null;
-    const dueAt = dueAtRaw ? new Date(dueAtRaw).toISOString() : null;
-    const closeAt = closeAtRaw ? new Date(closeAtRaw).toISOString() : null;
-    const reviewAt = reviewAtRaw ? new Date(reviewAtRaw).toISOString() : null;
+    const openAtDate = openAtRaw ? parseDateTimeLocalWib(openAtRaw) : null;
+    const dueAtDate = dueAtRaw ? parseDateTimeLocalWib(dueAtRaw) : null;
+    const closeAtDate = closeAtRaw ? parseDateTimeLocalWib(closeAtRaw) : null;
+    const reviewAtDate = reviewAtRaw ? parseDateTimeLocalWib(reviewAtRaw) : null;
+    if (
+      (openAtRaw && !openAtDate) ||
+      (dueAtRaw && !dueAtDate) ||
+      (closeAtRaw && !closeAtDate) ||
+      (reviewAtRaw && !reviewAtDate)
+    ) {
+      return { error: "Format waktu kuis tidak valid." };
+    }
+
+    const openAt = openAtDate?.toISOString() ?? null;
+    const dueAt = dueAtDate?.toISOString() ?? null;
+    const closeAt = closeAtDate?.toISOString() ?? null;
+    const reviewAt = reviewAtDate?.toISOString() ?? null;
 
     const parsed = quizSchema.safeParse({
       type,
@@ -85,11 +103,15 @@ export async function createQuizAction(
       };
     }
 
-    const { error } = await supabase.from("quizzes").insert(parsed.data);
+    const { error } = await supabase.from("quizzes").insert({
+      ...parsed.data,
+      purpose,
+    });
 
     if (error) return { error: error.message };
 
     if (classId) revalidatePath(`/teacher/kelas/${classId}`);
+    revalidatePath("/student/pra-kelas");
     return { success: true };
   } catch (err) {
     return {
@@ -109,6 +131,10 @@ export async function updateQuizAction(
 
     const title = (formData.get("title") as string)?.trim();
     const description = (formData.get("description") as string)?.trim() || null;
+    const purpose = (formData.get("purpose") as string)?.trim() || "practice";
+    if (purpose !== "practice" && purpose !== "pre_test") {
+      return { error: "Tujuan kuis tidak valid." };
+    }
     const passingScore = parseInt(
       (formData.get("passing_score") as string) || "70",
       10,
@@ -134,10 +160,23 @@ export async function updateQuizAction(
       };
     }
 
-    const openAt = openAtRaw ? new Date(openAtRaw).toISOString() : null;
-    const dueAt = dueAtRaw ? new Date(dueAtRaw).toISOString() : null;
-    const closeAt = closeAtRaw ? new Date(closeAtRaw).toISOString() : null;
-    const reviewAt = reviewAtRaw ? new Date(reviewAtRaw).toISOString() : null;
+    const openAtDate = openAtRaw ? parseDateTimeLocalWib(openAtRaw) : null;
+    const dueAtDate = dueAtRaw ? parseDateTimeLocalWib(dueAtRaw) : null;
+    const closeAtDate = closeAtRaw ? parseDateTimeLocalWib(closeAtRaw) : null;
+    const reviewAtDate = reviewAtRaw ? parseDateTimeLocalWib(reviewAtRaw) : null;
+    if (
+      (openAtRaw && !openAtDate) ||
+      (dueAtRaw && !dueAtDate) ||
+      (closeAtRaw && !closeAtDate) ||
+      (reviewAtRaw && !reviewAtDate)
+    ) {
+      return { error: "Format waktu kuis tidak valid." };
+    }
+
+    const openAt = openAtDate?.toISOString() ?? null;
+    const dueAt = dueAtDate?.toISOString() ?? null;
+    const closeAt = closeAtDate?.toISOString() ?? null;
+    const reviewAt = reviewAtDate?.toISOString() ?? null;
 
     const { data: existingQuiz } = await supabase
       .from("quizzes")
@@ -192,6 +231,7 @@ export async function updateQuizAction(
     const updatePayload: Record<string, any> = {
       title,
       description,
+      purpose,
       passing_score: passingScore,
       feedback_mode: feedbackMode,
       review_at: reviewAt,
@@ -213,6 +253,7 @@ export async function updateQuizAction(
     if (error) return { error: error.message };
 
     if (classId) revalidatePath(`/teacher/kelas/${classId}`);
+    revalidatePath("/student/pra-kelas");
     return { success: true };
   } catch (err) {
     return {
@@ -439,6 +480,7 @@ export async function submitQuizAction(
     if (error) return { success: false, error: error.message };
 
     revalidatePath("/student");
+    revalidatePath("/student/pra-kelas");
     revalidatePath(`/student/kuis/${quizId}`);
     return { success: true, result: data as QuizSubmissionResult };
   } catch (err) {
@@ -542,6 +584,7 @@ export async function finishQuizAction(
     });
     if (error) return { success: false, error: error.message };
     revalidatePath("/student");
+    revalidatePath("/student/pra-kelas");
     revalidatePath(`/student/kuis/${quizId}`);
     return { success: true, result: data as QuizSubmissionResult };
   } catch (err) {

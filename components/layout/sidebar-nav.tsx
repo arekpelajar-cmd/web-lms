@@ -3,7 +3,7 @@
 import { Suspense } from 'react'
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
-import { BookOpen, FileText, LayoutDashboard, School, UserCheck, Users, HelpCircle, type LucideIcon } from 'lucide-react'
+import { BookOpen, BookOpenCheck, FileText, LayoutDashboard, School, UserCheck, Users, HelpCircle, type LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Role } from '@/lib/roles'
 
@@ -18,6 +18,7 @@ type NavItem = { href: string; label: string; icon: LucideIcon }
 const NAV: Record<Role, NavItem[]> = {
   student: [
     { href: '/student', label: 'Pelajaran saya', icon: BookOpen },
+    { href: '/student/pra-kelas', label: 'Pra-kelas & Poin', icon: BookOpenCheck },
     { href: '/student/tugas', label: 'Tugas saya', icon: FileText },
     { href: '/student/kuis', label: 'Kuis & Ujian', icon: HelpCircle },
   ],

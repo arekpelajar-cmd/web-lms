@@ -36,6 +36,7 @@ export async function completeMaterialAction(materialId: string): Promise<Action
     if (error) return { error: error.message }
 
     revalidatePath('/student')
+    revalidatePath('/student/pra-kelas')
     revalidatePath(`/student/materi/${materialId}`)
     return { success: true, isCompleted: true }
   } catch (err) {
@@ -70,6 +71,7 @@ export async function toggleMaterialCompletionAction(materialId: string): Promis
       if (error) return { error: error.message }
 
       revalidatePath('/student')
+      revalidatePath('/student/pra-kelas')
       revalidatePath(`/student/materi/${materialId}`)
       return { success: true, isCompleted: false }
     } else {
@@ -82,6 +84,7 @@ export async function toggleMaterialCompletionAction(materialId: string): Promis
       if (error) return { error: error.message }
 
       revalidatePath('/student')
+      revalidatePath('/student/pra-kelas')
       revalidatePath(`/student/materi/${materialId}`)
       return { success: true, isCompleted: true }
     }

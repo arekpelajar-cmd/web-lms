@@ -6,9 +6,17 @@ import {
   isLateStillSubmittable,
   formatLateDuration,
   formatTimeRemaining,
+  parseDateTimeLocalWib,
 } from './assignment-utils'
 
 describe('Tahap 6: Assignment Utilities & Deadline Rules', () => {
+  it('menafsirkan batas waktu lokal sebagai WIB', () => {
+    expect(parseDateTimeLocalWib('2026-11-09T14:30')?.toISOString()).toBe(
+      '2026-11-09T07:30:00.000Z',
+    )
+    expect(parseDateTimeLocalWib('invalid')).toBeNull()
+  })
+
   const baseDue = new Date('2026-10-15T12:00:00Z')
   const extDue = new Date('2026-10-17T12:00:00Z')
 
