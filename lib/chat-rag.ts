@@ -1,4 +1,4 @@
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, ThinkingLevel } from "@google/genai";
 
 export const EMBEDDING_DIMENSIONS = 768;
 
@@ -114,6 +114,27 @@ async function embedText(
 
 export async function embedQuery(text: string) {
   return embedText(text, "RETRIEVAL_QUERY");
+}
+
+export async function* streamChatAnswer(
+  systemInstruction: string,
+  prompt: string,
+  abortSignal: AbortSignal,
+) {
+  const response = await getGenAI().models.generateContentStream({
+    model: process.env.GOOGLE_CHAT_MODEL || "gemini-3.8-flash",
+    contents: prompt,
+    config: {
+      systemInstruction,
+      maxOutputTokens: 512,
+      thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
+      abortSignal,
+    },
+  });
+
+  for await (const chunk of response) {
+    if (chunk.text) yield chunk.text;
+  }
 }
 
 export async function prepareMaterialEmbeddings(title: string, html: string) {
