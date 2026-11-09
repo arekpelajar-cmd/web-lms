@@ -13,7 +13,13 @@ function getGenAI() {
   if (!apiKey) {
     throw new Error("GOOGLE_GENERATIVE_AI_API_KEY belum dikonfigurasi.");
   }
-  genAI ??= new GoogleGenAI({ apiKey });
+  genAI ??= new GoogleGenAI({
+    apiKey,
+    httpOptions: {
+      timeout: 15_000,
+      retryOptions: { attempts: 1 },
+    },
+  });
   return genAI;
 }
 

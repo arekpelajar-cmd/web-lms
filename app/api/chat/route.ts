@@ -106,15 +106,29 @@ export async function POST(request: Request) {
     return `${message.role === "user" ? "Siswa" : "Asisten"}: ${text}`;
   }).filter((line) => !line.endsWith(": "));
 
+  let phase = "embedding";
+  let phaseStartedAt = Date.now();
   try {
+    console.info("Chatbot phase started:", phase);
     const queryEmbedding = await embedQuery(recentQuestions.join("\n"));
+    console.info("Chatbot phase completed:", phase, {
+      durationMs: Date.now() - phaseStartedAt,
+    });
+
+    phase = "module search";
+    phaseStartedAt = Date.now();
+    console.info("Chatbot phase started:", phase);
     const { data: matches, error: matchError } = await supabase.rpc("match_modul", {
       query_embedding: queryEmbedding,
       filter_class_id: enrollment.class_id,
       match_threshold: 0.35,
       match_count: 5,
-    });
+    }).abortSignal(AbortSignal.timeout(10_000));
     if (matchError) throw new Error(`Pencarian materi gagal: ${matchError.message}`);
+    console.info("Chatbot phase completed:", phase, {
+      durationMs: Date.now() - phaseStartedAt,
+      matchCount: matches?.length ?? 0,
+    });
 
     if (!matches?.length) return noContextResponse();
 
@@ -125,6 +139,9 @@ export async function POST(request: Request) {
       )
       .join("\n\n");
 
+    phase = "model stream";
+    phaseStartedAt = Date.now();
+    console.info("Chatbot phase started:", phase);
     const result = streamText({
       model: google(process.env.GOOGLE_CHAT_MODEL || "gemini-3.8-flash"),
       system: [
@@ -146,13 +163,26 @@ export async function POST(request: Request) {
         "PERTANYAAN TERBARU:",
         question,
       ].join("\n"),
+      timeout: {
+        totalMs: 45_000,
+        firstChunkMs: 20_000,
+        chunkMs: 15_000,
+      },
+      onError: ({ error }) => {
+        console.error("Chatbot model stream failed:", error);
+      },
     });
 
     return result.toUIMessageStreamResponse({
-      onError: () => "Chatbot gagal menghasilkan jawaban. Silakan coba lagi.",
+      onError: () => {
+        console.info("Chatbot model stream ended:", {
+          durationMs: Date.now() - phaseStartedAt,
+        });
+        return "Chatbot gagal menghasilkan jawaban. Silakan coba lagi.";
+      },
     });
   } catch (error) {
-    console.error("Chatbot request failed:", error);
+    console.error(`Chatbot request failed during ${phase}:`, error);
     return Response.json(
       { error: "Chatbot gagal memproses pertanyaan. Silakan coba lagi." },
       { status: 500 },
