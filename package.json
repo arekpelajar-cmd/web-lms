@@ -10,6 +10,9 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@ai-sdk/google": "^4.0.114",
+    "@ai-sdk/react": "^4.0.170",
+    "@google/genai": "^3.0.0",
     "@radix-ui/react-label": "^2.1.1",
     "@radix-ui/react-slot": "^1.1.1",
     "@supabase/ssr": "^0.5.2",
@@ -33,6 +36,7 @@
     "@tiptap/react": "^3.31.4",
     "@tiptap/starter-kit": "^3.31.4",
     "@types/katex": "^0.16.8",
+    "ai": "^7.0.166",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "isomorphic-dompurify": "^4.5.0",

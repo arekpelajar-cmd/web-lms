@@ -4,10 +4,12 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireRole } from "@/lib/auth";
 import { parseDateTimeLocalWib } from "@/lib/assignment-utils";
+import { prepareMaterialEmbeddings } from "@/lib/chat-rag";
 
 export type ActionState = {
   success?: boolean;
   error?: string | null;
+  message?: string;
   materialId?: string;
   audioId?: string;
 };
@@ -271,6 +273,82 @@ export async function updateMaterialAction(
   } catch (err) {
     return {
       error: err instanceof Error ? err.message : "Terjadi kesalahan sistem.",
+    };
+  }
+}
+
+export async function indexMaterialForChatAction(
+  materialId: string,
+  classId: string,
+): Promise<ActionState> {
+  try {
+    await requireRole("teacher");
+    const supabase = await createClient();
+    const { data: material, error: materialError } = await supabase
+      .from("materials")
+      .select("id, title, content, module:modules!inner(id, title, class_id)")
+      .eq("id", materialId)
+      .single();
+
+    if (materialError || !material) {
+      return { error: "Materi tidak ditemukan atau Anda tidak memiliki akses." };
+    }
+
+    const module = material.module as unknown as {
+      id: string;
+      title: string;
+      class_id: string;
+    };
+    if (module.class_id !== classId) {
+      return { error: "Materi bukan bagian dari kelas yang dipilih." };
+    }
+
+    const chunks = await prepareMaterialEmbeddings(
+      material.title,
+      material.content ?? "",
+    );
+
+    if (chunks.length > 0) {
+      const { error: upsertError } = await supabase
+        .from("modul_embeddings")
+        .upsert(
+          chunks.map((chunk) => ({
+            material_id: material.id,
+            module_id: module.id,
+            class_id: module.class_id,
+            material_title: material.title,
+            module_title: module.title,
+            chunk_index: chunk.chunk_index,
+            content: chunk.content,
+            embedding: chunk.embedding,
+          })),
+          { onConflict: "material_id,chunk_index" },
+        );
+      if (upsertError) throw new Error(`Penyimpanan indeks gagal: ${upsertError.message}`);
+    }
+
+    let deleteQuery = supabase
+      .from("modul_embeddings")
+      .delete()
+      .eq("material_id", material.id);
+    if (chunks.length > 0) {
+      deleteQuery = deleteQuery.gte("chunk_index", chunks.length);
+    }
+    const { error: cleanupError } = await deleteQuery;
+    if (cleanupError) {
+      throw new Error(`Pembersihan indeks lama gagal: ${cleanupError.message}`);
+    }
+
+    revalidatePath(`/teacher/kelas/${classId}`);
+    return {
+      success: true,
+      message: chunks.length
+        ? `${chunks.length} bagian materi berhasil diindeks untuk chatbot.`
+        : "Materi tidak memiliki teks yang bisa diindeks; indeks lama telah dihapus.",
+    };
+  } catch (err) {
+    return {
+      error: err instanceof Error ? err.message : "Pengindeksan materi gagal.",
     };
   }
 }

@@ -40,6 +40,7 @@ import {
   Video,
   Clock,
   Calendar,
+  Sparkles,
 } from "lucide-react";
 import { formatDateTimeId } from "@/lib/assignment-utils";
 import { SimulationManagerModal } from "@/components/teacher/simulation-manager-modal";
@@ -50,6 +51,7 @@ import {
   deleteModuleAction,
   createMaterialAction,
   updateMaterialAction,
+  indexMaterialForChatAction,
   deleteMaterialAction,
   createMaterialAudioAction,
   deleteMaterialAudioAction,
@@ -209,6 +211,12 @@ export function ModulesManager({
   );
   const [audioSuccess, setAudioSuccess] = useState<string | null>(null);
   const [materialNeedsReload, setMaterialNeedsReload] = useState(false);
+  const [indexingMaterialId, setIndexingMaterialId] = useState<string | null>(null);
+  const [ragStatus, setRagStatus] = useState<{
+    materialId: string;
+    message: string;
+    error: boolean;
+  } | null>(null);
   const audioFileInput = useRef<HTMLInputElement>(null);
 
   // Quiz modal states
@@ -862,6 +870,30 @@ export function ModulesManager({
     window.location.reload();
   }
 
+  async function handleIndexMaterial(mat: MaterialData) {
+    setIndexingMaterialId(mat.id);
+    setRagStatus(null);
+    try {
+      const result = await indexMaterialForChatAction(mat.id, classId);
+      setRagStatus({
+        materialId: mat.id,
+        message: result.error ?? result.message ?? "Indeks materi diperbarui.",
+        error: Boolean(result.error),
+      });
+    } catch (error) {
+      setRagStatus({
+        materialId: mat.id,
+        message:
+          error instanceof Error
+            ? error.message
+            : "Pengindeksan materi gagal. Silakan coba lagi.",
+        error: true,
+      });
+    } finally {
+      setIndexingMaterialId(null);
+    }
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -942,6 +974,15 @@ export function ModulesManager({
             );
           })}
         </div>
+      )}
+
+      {ragStatus && (
+        <p
+          role={ragStatus.error ? "alert" : "status"}
+          className={`text-sm ${ragStatus.error ? "text-destructive" : "text-muted-foreground"}`}
+        >
+          {ragStatus.message}
+        </p>
       )}
 
       {/* Daftar Modul */}
@@ -1087,6 +1128,17 @@ export function ModulesManager({
                           </div>
 
                           <div className="flex items-center gap-1 self-end sm:self-auto">
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              className="h-7 text-xs gap-1"
+                              disabled={indexingMaterialId !== null}
+                              onClick={() => handleIndexMaterial(mat)}
+                            >
+                              <Sparkles className="h-3 w-3" />
+                              {indexingMaterialId === mat.id ? "Mengindeks..." : "Indeks AI"}
+                            </Button>
                             <Button
                               type="button"
                               size="sm"

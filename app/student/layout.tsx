@@ -3,6 +3,7 @@ import { AppShell } from '@/components/layout/app-shell'
 import { requireRole } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import type { StudentSubjectNav } from '@/components/layout/sidebar-nav'
+import { ChatbotWidget } from '@/components/student/chatbot-widget'
 
 export default async function StudentLayout({ children }: { children: ReactNode }) {
   const profile = await requireRole('student')
@@ -45,6 +46,7 @@ export default async function StudentLayout({ children }: { children: ReactNode 
   return (
     <AppShell profile={profile} studentSubjects={subjects}>
       {children}
+      {enrollment?.class_id && <ChatbotWidget />}
     </AppShell>
   )
 }

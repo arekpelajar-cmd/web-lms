@@ -17,6 +17,7 @@ menggunakan Next.js dan Supabase.
 ## Daftar isi
 
 - [Fitur](#fitur)
+- [Chatbot AI berbasis RAG](#chatbot-ai-berbasis-rag)
 - [Teknologi](#teknologi)
 - [Arsitektur singkat](#arsitektur-singkat)
 - [Persyaratan](#persyaratan)
@@ -28,7 +29,6 @@ menggunakan Next.js dan Supabase.
 - [Catatan keamanan](#catatan-keamanan)
 - [Pemecahan masalah](#pemecahan-masalah)
 - [Lisensi](#lisensi)
-
 ## Fitur
 
 ### Siswa
@@ -80,6 +80,18 @@ menggunakan Next.js dan Supabase.
 - Lencana otomatis: **Siap Kelas**, **Lulus Pre-test**, dan **Skor Sempurna**.
 - Papan peringkat menampilkan hingga 10 siswa teratas di kelas.
 
+### Chatbot AI berbasis RAG
+
+- Siswa dapat bertanya kepada asisten berdasarkan materi teks di kelasnya.
+- Pencarian semantik menggunakan pgvector dan embeddings Gemini; jawaban
+  menyertakan nomor rujukan materi dan menolak menjawab bila konteks tidak cukup.
+- Hasil pencarian mematuhi enrollment siswa, kebijakan RLS, dan aturan materi
+  berurutan yang sudah terbuka.
+- Guru dapat menekan **Indeks AI** pada materi untuk membuat atau memperbarui
+  indeksnya; indeks perlu diperbarui kembali setelah materi diedit.
+- Konfigurasi dan langkah setup lengkap tersedia di
+  [docs/rag-chatbot.md](./docs/rag-chatbot.md).
+
 ## Teknologi
 
 - **Next.js 15** dengan App Router dan React 19.
@@ -87,6 +99,8 @@ menggunakan Next.js dan Supabase.
 - **Tailwind CSS** serta komponen UI berbasis Radix UI.
 - **Supabase** untuk PostgreSQL, autentikasi, Row Level Security (RLS), dan
   penyimpanan file.
+- **Vercel AI SDK** dan **Google Gemini** untuk chatbot RAG serta embeddings.
+- **pgvector** untuk pencarian semantik potongan materi.
 - **TipTap** untuk penyuntingan materi rich text.
 - **Vitest** dan Testing Library untuk pengujian.
 
@@ -97,10 +111,12 @@ Browser
   └── Next.js App Router
         ├── Halaman dan komponen per peran
         ├── Server Actions untuk operasi tulis
+        ├── Route Handler chatbot RAG
         └── Supabase client (server/browser)
               ├── Supabase Auth
-              ├── PostgreSQL + RLS + fungsi RPC
+              ├── PostgreSQL + RLS + fungsi RPC + pgvector
               └── Supabase Storage
+        └── Google Gemini (chat dan embeddings)
 ```
 
 - Halaman aplikasi berada di `app/`; area siswa, guru, dan admin masing-masing
@@ -114,11 +130,14 @@ Browser
   pendaftaran.
 - RLS adalah lapisan pembatasan akses data di database. Jangan mengandalkan
   penyembunyian tombol atau validasi browser sebagai satu-satunya kontrol akses.
+- Endpoint chatbot memeriksa sesi, role siswa, enrollment, dan materi yang
+  diizinkan sebelum menggunakan konteks untuk membuat jawaban.
 
 ## Persyaratan
 
 - Node.js versi 20 atau lebih baru dan npm.
 - Proyek Supabase yang dapat diakses.
+- Google AI API key jika chatbot RAG akan digunakan.
 - Akses ke Supabase Dashboard untuk mengatur autentikasi, menjalankan SQL, dan
   membuat akun awal.
 
@@ -143,16 +162,21 @@ Browser
    ```dotenv
    NEXT_PUBLIC_SUPABASE_URL=https://YOUR_PROJECT_ID.supabase.co
    NEXT_PUBLIC_SUPABASE_ANON_KEY=YOUR_SUPABASE_ANON_OR_PUBLISHABLE_KEY
+   GOOGLE_GENERATIVE_AI_API_KEY=YOUR_GOOGLE_AI_STUDIO_API_KEY
+   GOOGLE_CHAT_MODEL=gemini-3.8-flash
+   GOOGLE_EMBEDDING_MODEL=gemini-embedding-001
 
    # Diperlukan untuk operasi admin yang membuat/mengelola akun Auth.
    # Hanya digunakan di server; jangan pernah memakai awalan NEXT_PUBLIC_.
    SUPABASE_SERVICE_ROLE_KEY=YOUR_SUPABASE_SERVICE_ROLE_KEY
    ```
 
-   Ganti nilai contoh dengan nilai dari **Supabase Dashboard → Project
-   Settings → API**. Kunci service role memiliki hak istimewa tinggi; simpan
-   hanya di environment server lokal/deployment dan jangan pernah mengirimnya ke
-   browser atau mengunggahnya ke Git.
+   Ganti nilai Supabase dengan nilai dari **Supabase Dashboard → Project
+   Settings → API**, dan buat Google AI API key melalui Google AI Studio. Kunci
+   service role (jika diperlukan) dan Google API key memiliki hak istimewa;
+   simpan hanya di environment server dan jangan pernah kirim ke browser atau
+   unggah ke Git. Variabel model bersifat opsional dan dapat disesuaikan dengan
+   model Gemini yang tersedia.
 
 4. Siapkan Supabase mengikuti [Menyiapkan Supabase](#menyiapkan-supabase).
 
@@ -198,12 +222,29 @@ sebelum menjalankan migration berikutnya.
 | `0015_quiz_feedback_constraints.sql` | Batasan dan validasi pengaturan umpan balik kuis |
 | `0016_profile_preferences.sql` | Preferensi profil dan bucket avatar |
 | `0017_preclass_and_gamification.sql` | Materi pra-kelas, pre-test, poin, lencana, dan leaderboard |
+| `0018_rag_chatbot.sql` | pgvector, indeks embedding materi, RLS, dan RPC `match_modul` |
 
 Migration dapat membuat atau memperbarui bucket Supabase Storage dan kebijakan
 aksesnya. Jalankan migration yang sama pada setiap environment database yang
 akan digunakan.
 
-### 3. Buat akun administrator dan guru
+### 3. Siapkan chatbot RAG (opsional)
+
+Setelah migration `0018_rag_chatbot.sql` diterapkan dan variabel Google AI
+ditambahkan ke environment server:
+
+1. Masuk sebagai guru dan buka **Kelola Kelas → Modul**.
+2. Tekan **Indeks AI** pada setiap materi teks yang ingin tersedia untuk
+   pencarian chatbot. Ulangi setelah isi materi berubah.
+3. Masuk sebagai siswa terdaftar untuk membuka widget chatbot pada area siswa.
+
+Embedding menggunakan `gemini-embedding-001` dengan 768 dimensi yang harus sama
+dengan skema pgvector. Model chat default dapat diganti melalui
+`GOOGLE_CHAT_MODEL`. Detail alur, keamanan, dan pemecahan masalah tersedia di
+[panduan chatbot RAG](./docs/rag-chatbot.md). Gambar, video, dan audio tidak
+diindeks sebagai teks; tambahkan transkrip ke isi materi bila diperlukan.
+
+### 4. Buat akun administrator dan guru
 
 1. Buat pengguna melalui **Authentication → Users → Add user** di Supabase.
 2. Catat alamat email dan UUID akun yang dibuat.
@@ -220,7 +261,7 @@ akses proyek.
 Jika fungsi admin untuk membuat/mengelola akun Auth digunakan, pastikan
 `SUPABASE_SERVICE_ROLE_KEY` tersedia di environment server.
 
-### 4. Daftarkan siswa
+### 5. Daftarkan siswa
 
 Siswa mendaftar melalui `/register` menggunakan nama, NIS, kata sandi, dan kode
 kelas yang diberikan guru. NIS dinormalisasi menjadi email internal
@@ -287,6 +328,7 @@ components/
   teacher/                Komponen pengelolaan guru
 lib/
   actions/                Server actions
+  chat-rag.ts             Sanitasi, chunking, dan embeddings RAG
   simulations/            Validasi embed dan CSP
   supabase/               Client, server client, dan middleware
   *.test.ts               Unit test
@@ -300,6 +342,8 @@ supabase/
 
 - Jangan commit `.env.local`, kunci service role, kata sandi, atau data pribadi
   siswa.
+- Jangan commit `GOOGLE_GENERATIVE_AI_API_KEY`; gunakan hanya di environment
+  server dan lakukan rotasi segera jika pernah terungkap.
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY` memang digunakan oleh aplikasi browser; akses
   data tetap harus dikontrol dengan RLS.
 - `SUPABASE_SERVICE_ROLE_KEY` melewati RLS. Jangan mengeksposnya ke client,
@@ -339,6 +383,14 @@ Pastikan profil pengguna memiliki peran `teacher` dan terdapat baris
 
 Pastikan migration terkait sudah dijalankan dan bucket beserta kebijakan
 Storage-nya tersedia di proyek Supabase yang digunakan aplikasi.
+
+### Chatbot tidak menemukan materi atau gagal terhubung ke Gemini
+
+Pastikan migration `0018_rag_chatbot.sql` telah diterapkan, variabel Google AI
+terpasang pada environment server, dan materi teks sudah diindeks ulang oleh
+guru. Materi terkunci, kelas lain, serta konten gambar/video/audio tanpa
+transkrip tidak tersedia sebagai konteks pencarian. Periksa log server untuk
+kesalahan API atau kebijakan database.
 
 ## Lisensi
 
