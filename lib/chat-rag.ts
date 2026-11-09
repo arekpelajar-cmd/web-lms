@@ -128,6 +128,10 @@ export async function* streamChatAnswer(
       systemInstruction,
       maxOutputTokens: 512,
       thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
+      httpOptions: {
+        timeout: 40_000,
+        retryOptions: { attempts: 1 },
+      },
       abortSignal,
     },
   });

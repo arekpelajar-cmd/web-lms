@@ -169,7 +169,7 @@ export async function POST(request: Request) {
         try {
           const abortSignal = AbortSignal.any([
             request.signal,
-            AbortSignal.timeout(30_000),
+            AbortSignal.timeout(45_000),
           ]);
           for await (const delta of streamChatAnswer(
             systemInstruction,
