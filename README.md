@@ -1,9 +1,15 @@
-# EduSpace
+# ⚡ EduSpace — Learning Management System Interaktif
 
-Learning Management System (LMS) berbasis web untuk mengelola kelas, materi,
-kuis, tugas, progres, dan aktivitas pra-kelas. Aplikasi dibuat dengan Next.js
-dan Supabase, dengan antarmuka berbahasa Indonesia untuk siswa, guru, dan
-administrator.
+![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js)
+![React](https://img.shields.io/badge/React-19-149eca?logo=react)
+![TypeScript](https://img.shields.io/badge/TypeScript-5-3178c6?logo=typescript)
+![Supabase](https://img.shields.io/badge/Supabase-Database%20%26%20Auth-3ecf8e?logo=supabase)
+![License](https://img.shields.io/badge/License-MIT-2ea44f)
+
+Platform LMS berbasis web untuk mengelola kelas, materi multimedia, kuis, tugas,
+dan progres belajar. Mendukung aktivitas pra-kelas dan gamifikasi, dengan
+antarmuka berbahasa Indonesia untuk siswa, guru, dan administrator. Dibangun
+menggunakan Next.js dan Supabase.
 
 > **Status:** proyek aktif dalam pengembangan. Fitur yang tersedia dapat berubah
 > mengikuti migration database dan implementasi terbaru.
